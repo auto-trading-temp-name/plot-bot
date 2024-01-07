@@ -39,6 +39,7 @@ dependencies:
       - pycparser==2.21
       - python-dotenv==1.0.0
       - requests==2.31.0
+      - schedule==1.2.1
       - tinycss2==1.2.1
       - urllib3==2.1.0
       - webencodings==0.5.1
