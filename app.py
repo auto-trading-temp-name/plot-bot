@@ -31,7 +31,8 @@ async def plot():
 			png_file = io.BytesIO(png_bytes)
 			files.append(File(png_file, filename=f'{algorithm}{interval}.png'))
 
-		await channel.send(content=f"Plotting algorithm {algorithm} at intervals {intervals}", files=files)
+		message = await channel.send(content=f"Plotting algorithm {algorithm} at intervals {intervals}", files=files)
+		await message.publish()
 
 bot = commands.Bot(command_prefix='/', description=description, intents=Intents.default())
 
