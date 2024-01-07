@@ -1,7 +1,7 @@
 import dotenv, os, io, asyncio, schedule
 from discord import Intents, File, app_commands
 from discord.ext import commands
-from datetime import datetime
+from datetime import datetime, timedelta
 from cairosvg import svg2png
 from requests import get
 
@@ -15,8 +15,8 @@ algorithms = ['bollinger_bands', 'rsi', 'custom_bollinger_rsi', 'price']
 intervals = [30, 60, 240, 1440]
 channel_id = int(os.environ['CHANNEL_ID'])
 channel = None
-run_plots = False
 continue_running = True
+next_run = datetime.now()
 
 async def plot():
 	global algorithms, intervals
@@ -35,19 +35,14 @@ async def plot():
 
 bot = commands.Bot(command_prefix='/', description=description, intents=Intents.default())
 
-def job_function():
-	global run_plots
-	run_plots = True
-
 def get_next_run(time_format='human'):
-	seconds = ((schedule.jobs[0].next_run or datetime.now()) - datetime.now()).total_seconds()
+	seconds = (next_run - datetime.now()).total_seconds()
 	return seconds / 60.0 if time_format == 'minutes' else seconds if time_format == 'seconds' else f'{int(seconds // 60)}:{int(seconds % 60)}'
 
 @bot.event
 async def on_ready():
-	global run_plots, continue_running
+	global continue_running, next_run
 	print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-	schedule.every().hour.at(f':{intervals[0]}').do(job_function)
 
 	try:
 		synced = await bot.tree.sync()
@@ -55,11 +50,9 @@ async def on_ready():
 
 		while True:
 			if continue_running:
-				schedule.run_pending()
-				if run_plots:
-					run_plots = False
-					await plot()
-			await asyncio.sleep(1)
+				await plot()
+			next_run = datetime.now() + timedelta(minutes=15)
+			await asyncio.sleep(15 * 60)
 	except Exception:
 		pass
 
@@ -68,7 +61,7 @@ async def on_ready():
 @app_commands.default_permissions(manage_guild=True)
 async def start_loop(interaction):
 	global channel, continue_running, thread
-	await interaction.response.send_message(f'Starting plots. Next run is in {get_next_run()}', silent=True)
+	await interaction.response.send_message(f'Starting plots. Next run is in {get_next_run()}', ephemeral=True)
 
 	channel = interaction.channel
 	continue_running = True
@@ -77,8 +70,15 @@ async def start_loop(interaction):
 @app_commands.default_permissions(manage_guild=True)
 async def stop_loop(interaction):
 	global continue_running
-	await interaction.response.send_message('Stopping plots', silent=True)
+	await interaction.response.send_message('Stopping plots', ephemeral=True)
 	continue_running = False
+
+@bot.tree.command(name='force_plot')
+@app_commands.default_permissions(manage_guild=True)
+async def force_plot(interaction):
+	global continue_running
+	await interaction.response.send_message('Sending plots instantly', ephemeral=True)
+	await plot()
 
 @bot.tree.command(name='status')
 async def status(interaction):
